@@ -67,7 +67,6 @@ class Artist(db.Model):
     facebook_link = db.Column(db.String(120))
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
-    genres = db.Column(db.String(120))
     website = db.Column(db.String(120))
     seeking_description = db.Column(db.String)
     seeking_venue = db.Column(db.Boolean, nullable = False, default = False)
@@ -84,6 +83,8 @@ class Show(db.Model):
   artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), nullable = False)
   venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), nullable = False)
   start_time = db.Column(db.DateTime, nullable = False)
+  #start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
 
 #----------------------------------------------------------------------------#
 # Filters.
@@ -260,21 +261,21 @@ def show_venue(venue_id):
   upcomingShows = []
 
   for show in shows:
-      date = datetime.strptime(show.start_time,'%Y-%m-%d %H:%M:%S')
+      date = datetime.strptime(str(show.start_time),"%Y-%m-%d %H:%M:%S")
 
       if date < datetime.now():
         pastShows.append({
             "artist_id": Artist.query.filter_by(id=show.artist_id).first().id,
             "artist_name": Artist.query.filter_by(id=show.artist_id).first().name,
             "artist_image_link": Artist.query.filter_by(id=show.artist_id).first().image_link,
-            "start_time": show.start_time
+            "start_time": str(show.start_time)
         })
       if date > datetime.now():
         upcomingShows.append({
             "artist_id": Artist.query.filter_by(id=show.artist_id).first().id,
             "artist_name": Artist.query.filter_by(id=show.artist_id).first().name,
             "artist_image_link": Artist.query.filter_by(id=show.artist_id).first().image_link,
-            "start_time": show.start_time
+            "start_time": str(show.start_time)
         })
   data = {
       "id": venue.id,
@@ -305,13 +306,39 @@ def create_venue_form():
 def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
-
+  error = False
+  try:
+      venue = Venue(
+        name = request.form['name'],
+        city = request.form['city'],
+        state = request.form['state'],
+        address = request.form['address'],
+        phone = request.form['phone'],
+        genres = request.form.getlist('genres'),
+        facebook_link = request.form['facebook_link'],
+        image_link = request.form['image_link'],
+        website = request.form['website'],
+        seeking_description = request.form['seeking_description']
+      )
+      db.session.add(venue)
+      db.session.commit()
+  except Exception:
+      error = True
+      db.session.rollback()
+      print(sys.exc_info())
+  finally:
+      # Always Close the session.
+      db.session.close()
+  if error:
+      flash('An error occurred. Venue ' + request.form['name'] + ' could not be listed.')
+      return render_template('pages/home.html')
+  else:
   # on successful db insert, flash success
-  flash('Venue ' + request.form['name'] + ' was successfully listed!')
+      flash('Venue ' + request.form['name'] + ' was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-  return render_template('pages/home.html')
+      return render_template('pages/home.html')
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
@@ -462,21 +489,24 @@ def show_artist(artist_id):
   upcomingShows = []
 
   for show in shows:
-      date = datetime.strptime(show.start_time,'%Y-%m-%d %H:%M:%S')
+      date = datetime.strptime(str(show.start_time),'%Y-%m-%d %H:%M:%S')
+      #date = show.start_time.apply(lambda x: datetime.strptime(x,'%Y-%m'))
+      #train['date1'] = train['ID'].apply(lambda x: datetime.strptime(x, '%Y%m%d%H'))
+
 
       if date < datetime.now():
         pastShows.append({
             "venue_id": Venue.query.filter_by(id=show.venue_id).first().id,
             "venue_name": Venue.query.filter_by(id=show.venue_id).first().name,
             "venue_image_link": Venue.query.filter_by(id=show.venue_id).first().image_link,
-            "start_time": show.start_time
+            "start_time": str(show.start_time)
         })
       if date > datetime.now():
         upcomingShows.append({
             "venue_id": Venue.query.filter_by(id=show.venue_id).first().id,
             "venue_name": Venue.query.filter_by(id=show.venue_id).first().name,
             "venue_image_link": Venue.query.filter_by(id=show.venue_id).first().image_link,
-            "start_time": show.start_time
+            "start_time": str(show.start_time)
         })  
   data = {
       "id": artist.id,
@@ -640,16 +670,17 @@ def create_artist_submission():
       # Always close the session
       db.session.close()
   if error:
+
       # TODO: on unsuccessful db insert, flash an error instead.
       flash('An error occurred. Artist ' + request.form['name'] + ' could not be listed.')
       return render_template('pages/home.html')
 
   # on successful db insert, flash success
   else:
-    flash('Artist ' + request.form['name'] + ' was successfully listed!')
+      flash('Artist ' + request.form['name'] + ' was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
-    return render_template('pages/home.html')
+      return render_template('pages/home.html')
 
 
 #  Shows
@@ -705,7 +736,7 @@ def shows():
           "artist_id": show.artist_id,
           "artist_name": db.session.query(Artist.name).filter_by(id=show.artist_id).first()[0],
           "artist_image_link": db.session.query(Artist.image_link).filter_by(id=show.artist_id).first()[0],
-          "start_time": show.start_time
+          "start_time": str(show.start_time)
       }
       print(show['start_time'])	  
       data.append(show)
